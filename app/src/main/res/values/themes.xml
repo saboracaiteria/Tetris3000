@@ -1,7 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="AppTheme" parent="android:Theme.Material.NoActionBar.Fullscreen">
-        <item name="android:statusBarColor">@color/black</item>
-        <item name="android:navigationBarColor">@color/black</item>
+    <style name="Theme.Tetris3000" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">#FF3700B3</item>
     </style>
 </resources>
