@@ -7,6 +7,9 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -21,10 +24,15 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Accept Android SDK licenses
+        run: |
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+          yes | $ANDROID_SDK_ROOT/tools/bin/sdkmanager --licenses > /dev/null 2>&1 || true
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v3
 
-      - name: Grant execute permission
+      - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build Debug APK
@@ -41,26 +49,26 @@ jobs:
       - name: Get version from app
         id: get_version
         run: |
-          # Extrai versionName e versionCode do build.gradle
-          VERSION_NAME=$(grep 'versionName' app/build.gradle.kts 2>/dev/null | head -1 | sed 's/.*"\(.*\)".*/\1/')
-          VERSION_CODE=$(grep 'versionCode' app/build.gradle.kts 2>/dev/null | head -1 | sed 's/.*versionCode\s*=\s*\([0-9]*\).*/\1/')
-          if [ -z "$VERSION_NAME" ]; then
-            VERSION_NAME=$(grep 'versionName' app/build.gradle 2>/dev/null | head -1 | sed 's/.*"\(.*\)".*/\1/')
-            VERSION_CODE=$(grep 'versionCode' app/build.gradle 2>/dev/null | head -1 | grep -oP '\d+')
+          if [ -f app/build.gradle.kts ]; then
+            VERSION_NAME=$(grep 'versionName' app/build.gradle.kts | head -1 | sed 's/.*"\(.*\)".*/\1/')
+            VERSION_CODE=$(grep 'versionCode' app/build.gradle.kts | head -1 | grep -oP '\d+')
+          elif [ -f app/build.gradle ]; then
+            VERSION_NAME=$(grep "versionName" app/build.gradle | head -1 | sed 's/.*"\(.*\)".*/\1/')
+            VERSION_CODE=$(grep "versionCode" app/build.gradle | head -1 | grep -oP '\d+')
           fi
-          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
-          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
-          echo "tag=v$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "version_name=${VERSION_NAME:-1.0.0}" >> $GITHUB_OUTPUT
+          echo "version_code=${VERSION_CODE:-1}" >> $GITHUB_OUTPUT
+          echo "tag=v${VERSION_NAME:-1.0.0}" >> $GITHUB_OUTPUT
 
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
-          tag_name: v${{ steps.get_version.outputs.version_name }}
-          name: "Tetris3000 v${{ steps.get_version.outputs.version_name }}"
+          tag_name: ${{ steps.get_version.outputs.tag }}
+          name: "Tetris3000 ${{ steps.get_version.outputs.tag }}"
           body: |
-            ## 🚀 Tetris3000 v${{ steps.get_version.outputs.version_name }}
+            ## 🚀 Tetris3000 ${{ steps.get_version.outputs.tag }}
 
             **Build automático** — APK gerado pelo GitHub Actions.
 
@@ -74,5 +82,3 @@ jobs:
           files: app/build/outputs/apk/debug/*.apk
           generate_release_notes: true
           fail_on_unmatched_files: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
