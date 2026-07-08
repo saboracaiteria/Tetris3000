@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Tetris3000" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:statusBarColor">#FF3700B3</item>
+    <style name="Theme.Tetris3000" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">#0a0d1a</item>
+        <item name="android:statusBarColor">#06091a</item>
+        <item name="android:navigationBarColor">#06091a</item>
+        <item name="android:windowLightStatusBar">false</item>
     </style>
 </resources>
