@@ -4,11 +4,11 @@ import android.app.Activity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.util.TypedValue
 import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
-import android.widget.Toast
 import kotlin.math.abs
 
 class MainActivity : Activity(), TetrisEngineCallback {
@@ -19,26 +19,22 @@ class MainActivity : Activity(), TetrisEngineCallback {
     private var isRunning = false
 
     companion object {
-        private const val INITIAL_DROP_DELAY = 500L
+        private const val BASE_DROP_DELAY = 500L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Create main container
         val rootLayout = FrameLayout(this).apply {
             setBackgroundColor(android.graphics.Color.parseColor("#1a1a2e"))
         }
 
-        // Create Tetris view
         tetrisView = TetrisView(this)
         engine = tetrisView.getEngine()
         engine.setCallback(this)
 
-        // Create button overlay
         val buttonOverlay = View.inflate(this, R.layout.activity_main, null) as FrameLayout
 
-        // Setup buttons
         buttonOverlay.findViewById<Button>(R.id.btnLeft)?.setOnClickListener {
             engine.moveLeft()
             tetrisView.updateBoard()
@@ -62,6 +58,7 @@ class MainActivity : Activity(), TetrisEngineCallback {
         buttonOverlay.findViewById<Button>(R.id.btnPause)?.setOnClickListener {
             engine.togglePause()
             tetrisView.updateBoard()
+            if (engine.isPaused) stopDropLoop() else startDropLoop()
         }
         buttonOverlay.findViewById<Button>(R.id.btnRestart)?.setOnClickListener {
             engine.start()
@@ -69,7 +66,6 @@ class MainActivity : Activity(), TetrisEngineCallback {
             startDropLoop()
         }
 
-        // Add views to root
         rootLayout.addView(tetrisView, FrameLayout.LayoutParams(
             FrameLayout.LayoutParams.MATCH_PARENT,
             FrameLayout.LayoutParams.MATCH_PARENT
@@ -80,16 +76,16 @@ class MainActivity : Activity(), TetrisEngineCallback {
         ))
 
         setContentView(rootLayout)
-
-        // Swipe controls on the Tetris view
         setupSwipeControls()
     }
 
     override fun onResume() {
         super.onResume()
-        engine.start()
-        tetrisView.updateBoard()
-        startDropLoop()
+        if (!engine.isGameOver) {
+            engine.start()
+            tetrisView.updateBoard()
+            startDropLoop()
+        }
     }
 
     override fun onPause() {
@@ -111,19 +107,26 @@ class MainActivity : Activity(), TetrisEngineCallback {
 
     private fun scheduleNextDrop() {
         if (!isRunning || engine.isGameOver || engine.isPaused) return
+        // Delay inversamente proporcional ao level: level 1 = 500ms, level 10 = 50ms
+        val delay = (BASE_DROP_DELAY / engine.level).coerceAtLeast(50L)
         dropHandler.postDelayed({
             if (isRunning && !engine.isGameOver && !engine.isPaused) {
                 engine.moveDown()
                 tetrisView.updateBoard()
                 scheduleNextDrop()
             }
-        }, engine.level.toLong())
+        }, delay)
+    }
+
+    private fun dpToPx(dp: Float): Float {
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, resources.displayMetrics)
     }
 
     private fun setupSwipeControls() {
         var startX = 0f
         var startY = 0f
         var startTime = 0L
+        val minSwipeDistance = dpToPx(50f) // 50dp em pixels
 
         tetrisView.setOnTouchListener { _, event ->
             when (event.action) {
@@ -142,7 +145,42 @@ class MainActivity : Activity(), TetrisEngineCallback {
 
                     if (time < 300) {
                         when {
-                            absDx > absDy && absDx > 100 -> {
+                            absDx > absDy && absDx > minSwipeDistance -> {
+                                if (dx > 0) engine.moveRight() else engine.moveLeft()
+                                tetrisView.updateBoard()
+                            }
+                            absDy > absDx && absDy > minSwipeDistance -> {
+                                if (dy > 0) engine.hardDrop() else engine.rotate()
+                                tetrisView.updateBoard()
+                            }
+                            absDx < minSwipeDistance * 0.5f && absDy < minSwipeDistance * 0.5f -> {
+                                // Tap = rotate
+                                engine.rotate()
+                                tetrisView.updateBoard()
+                            }
+                        }
+                    }
+                    true
+                }
+                else -> false
+            }
+        }
+    }
+
+    // TetrisEngineCallback implementations
+    override fun onBoardChanged() {
+        tetrisView.updateBoard()
+    }
+
+    override fun onGameOver() {
+        stopDropLoop()
+        tetrisView.updateBoard()
+    }
+
+    override fun onScoreChanged(score: Int, level: Int, lines: Int) {}
+
+    override fun onNextPieceChanged(piece: PieceType) {}
+}
                                 if (dx > 0) engine.moveRight() else engine.moveLeft()
                                 tetrisView.updateBoard()
                             }

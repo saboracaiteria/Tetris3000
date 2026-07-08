@@ -12,6 +12,7 @@ class GameRenderer(private val game: TetrisGame) : GLSurfaceView.Renderer {
     private val projectionMatrix = FloatArray(16)
     private val viewMatrix = FloatArray(16)
     private var program = 0
+    private var aspectRatio = 1f
 
     private val vertexShaderCode = "uniform mat4 uMVPMatrix;\nattribute vec4 vPosition;\nattribute vec4 vColor;\nvarying vec4 vOutColor;\nvoid main() {\n  gl_Position = uMVPMatrix * vPosition;\n  vOutColor = vColor;\n}"
 
@@ -34,14 +35,23 @@ class GameRenderer(private val game: TetrisGame) : GLSurfaceView.Renderer {
 
     override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
         GLES20.glViewport(0, 0, width, height)
-        val ratio = width.toFloat() / height
-        Matrix.frustumM(projectionMatrix, 0, -ratio, ratio, -1f, 1f, 3f, 40f)
+        aspectRatio = width.toFloat() / height
+
+        // Frustum adaptativo mantendo o tabuleiro proporcional
+        val viewHeight = 12f // altura do campo visível
+        val viewWidth = viewHeight * aspectRatio
+        Matrix.frustumM(projectionMatrix, 0, -viewWidth / 2f, viewWidth / 2f, -viewHeight / 2f, viewHeight / 2f, 3f, 40f)
     }
 
     override fun onDrawFrame(gl: GL10?) {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT or GLES20.GL_DEPTH_BUFFER_BIT)
-        Matrix.setLookAtM(viewMatrix, 0, 4.5f, -9.5f, 18.0f, 4.5f, -9.5f, 0f, 0f, 1f, 0f)
 
+        // Câmera posicionada dinamicamente baseada no aspect ratio
+        val camZ = 14f + (aspectRatio - 0.5f) * 4f
+        val camY = -8f - (aspectRatio - 0.5f) * 2f
+        Matrix.setLookAtM(viewMatrix, 0, 4.5f, camY, camZ, 4.5f, -9.5f, 0f, 0f, 1f, 0f)
+
+        // Desenha blocos travados
         for (y in 0 until 20) {
             for (x in 0 until 10) {
                 val colorType = game.grid[y][x]
@@ -51,6 +61,7 @@ class GameRenderer(private val game: TetrisGame) : GLSurfaceView.Renderer {
             }
         }
 
+        // Desenha peça atual
         val shape = game.currentShape
         for (pos in shape) {
             val px = game.currentX + pos.x
@@ -82,6 +93,11 @@ class GameRenderer(private val game: TetrisGame) : GLSurfaceView.Renderer {
 
     private fun loadShader(type: Int, shaderCode: String): Int {
         return GLES20.glCreateShader(type).also { shader ->
+            GLES20.glShaderSource(shader, shaderCode)
+            GLES20.glCompileShader(shader)
+        }
+    }
+}
             GLES20.glShaderSource(shader, shaderCode)
             GLES20.glCompileShader(shader)
         }
