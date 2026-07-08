@@ -63,22 +63,15 @@ jobs:
       - name: Create Release
         id: create_release
         uses: softprops/action-gh-release@v2
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         with:
           tag_name: ${{ steps.get_version.outputs.tag }}
-          name: "Tetris3000 ${{ steps.get_version.outputs.tag }}"
+          name: "Tetris Canaã v${{ steps.get_version.outputs.version_name }}"
           body: |
-            ## 🚀 Tetris3000 ${{ steps.get_version.outputs.tag }}
-
-            **Build automático** — APK gerado pelo GitHub Actions.
-
-            ### Instalação
-            1. Baixe o APK abaixo
-            2. Ative "Instalar de fontes desconhecidas" se necessário
-            3. Instale e jogue!
-
-            ### Changelog
-            Veja os commits em: \${{ github.server_url }}/\${{ github.repository }}/commits/main
+            ## Tetris Canaã v${{ steps.get_version.outputs.version_name }}
+            - Build automático via GitHub Actions
+            - APK Debug gerado e anexado
+          draft: false
+          prerelease: false
           files: app/build/outputs/apk/debug/*.apk
-          generate_release_notes: true
-          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
