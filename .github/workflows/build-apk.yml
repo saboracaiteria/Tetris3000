@@ -37,3 +37,42 @@ jobs:
           path: app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Get version from app
+        id: get_version
+        run: |
+          # Extrai versionName e versionCode do build.gradle
+          VERSION_NAME=$(grep 'versionName' app/build.gradle.kts 2>/dev/null | head -1 | sed 's/.*"\(.*\)".*/\1/')
+          VERSION_CODE=$(grep 'versionCode' app/build.gradle.kts 2>/dev/null | head -1 | sed 's/.*versionCode\s*=\s*\([0-9]*\).*/\1/')
+          if [ -z "$VERSION_NAME" ]; then
+            VERSION_NAME=$(grep 'versionName' app/build.gradle 2>/dev/null | head -1 | sed 's/.*"\(.*\)".*/\1/')
+            VERSION_CODE=$(grep 'versionCode' app/build.gradle 2>/dev/null | head -1 | grep -oP '\d+')
+          fi
+          echo "version_name=$VERSION_NAME" >> $GITHUB_OUTPUT
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          echo "tag=v$VERSION_NAME" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        with:
+          tag_name: v${{ steps.get_version.outputs.version_name }}
+          name: "Tetris3000 v${{ steps.get_version.outputs.version_name }}"
+          body: |
+            ## 🚀 Tetris3000 v${{ steps.get_version.outputs.version_name }}
+
+            **Build automático** — APK gerado pelo GitHub Actions.
+
+            ### Instalação
+            1. Baixe o APK abaixo
+            2. Ative "Instalar de fontes desconhecidas" se necessário
+            3. Instale e jogue!
+
+            ### Changelog
+            Veja os commits em: \${{ github.server_url }}/\${{ github.repository }}/commits/main
+          files: app/build/outputs/apk/debug/*.apk
+          generate_release_notes: true
+          fail_on_unmatched_files: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
